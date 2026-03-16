@@ -515,7 +515,8 @@ function fillDemo() {
 function startTournament() {
   const sel = document.getElementById('num-players');
   N = sel ? parseInt(sel.value) : 8;
-  kFactor = parseFloat(document.getElementById('k-factor').value) || 20;
+  kFactor = parseFloat(document.getElementById('k-factor').value) || 40;
+  tournamentName = document.getElementById('toernooi-naam').value.trim() || 'Toernooi';
   players = []; ratings = [];
   for (let i = 0; i < N; i++) {
     const v = document.getElementById(`p${i}`).value.trim();
