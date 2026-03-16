@@ -281,7 +281,12 @@
   <div class="section-title">Spelers &amp; instellingen</div>
 
   <div class="k-row">
-    <label for="k-factor">K-factor</label>
+    <label for="num-players">Aantal spelers</label>
+    <select class="k-input" id="num-players" onchange="buildSetup()" style="width:auto;padding:.4rem .6rem;cursor:pointer">
+      <option value="8" selected>8 spelers</option>
+      <option value="7">7 spelers</option>
+    </select>
+    <label for="k-factor" style="margin-left:.5rem">K-factor</label>
     <input class="k-input" id="k-factor" type="number" value="20" min="1" max="800">
     <span class="k-hint">standaard 20 voor jeugd</span>
   </div>
@@ -319,6 +324,7 @@
             <th>W</th>
             <th>R</th>
             <th>V</th>
+            <th>Bye</th>
             <th>Punten</th>
             <th>Onderl.</th>
             <th>SB</th>
@@ -352,7 +358,7 @@
   <div class="modal">
     <div class="modal-title" id="modal-title">Ratingverloop</div>
     <table class="modal-table">
-      <thead><tr><th>Ronde</th><th>Tegenstander</th><th>Uitslag</th><th>Rating teg.</th><th>Verwacht</th><th>+/-</th></tr></thead>
+      <thead><tr><th>Ronde</th><th>Tegenstander</th><th>Kleur</th><th>Uitslag</th><th>Rating teg.</th><th>Verwacht</th><th>+/-</th></tr></thead>
       <tbody id="modal-body"></tbody>
     </table>
     <button class="btn modal-close" onclick="document.getElementById('rating-modal').classList.remove('open')">Sluiten</button>
@@ -369,9 +375,11 @@
 </div>
 
 <script>
-const N = 8;
+let N = 8;
 let players = [], ratings = [], results = [], kFactor = 20;
 
+// Vaste indeling — altijd het 8-spelers schema
+// Bij 7 spelers worden partijen waarbij speler index 7 betrokken is overgeslagen (geen punten)
 const FIXED_ROUNDS = [
   [[5,1],[4,2],[3,7],[6,0]],
   [[1,4],[0,5],[2,3],[7,6]],
@@ -382,7 +390,13 @@ const FIXED_ROUNDS = [
   [[1,6],[0,7],[3,4],[2,5]]
 ];
 
+function isSkipped(i, j) {
+  return i >= N || j >= N;
+}
+
 function buildSetup() {
+  const sel = document.getElementById('num-players');
+  N = sel ? parseInt(sel.value) : 8;
   const grid = document.getElementById('players-grid');
   grid.innerHTML = '';
   for (let i = 0; i < N; i++) {
@@ -395,15 +409,17 @@ function buildSetup() {
 }
 
 function fillDemo() {
-  ['Lotte','Lasse','Maurits','Mats','Angel','Kaiser','Misha','Alexander'].forEach((n,i) => {
-    document.getElementById(`p${i}`).value = n;
-  });
-  [1200,1350,1180,1420,1300,1500,1250,1380].forEach((r,i) => {
-    document.getElementById(`r${i}`).value = r;
-  });
+  const names = ['Lotte','Lasse','Maurits','Mats','Angel','Kaiser','Misha','Alexander'];
+  const demoRatings = [1200,1350,1180,1420,1300,1500,1250,1380];
+  for (let i = 0; i < N; i++) {
+    document.getElementById(`p${i}`).value = names[i];
+    document.getElementById(`r${i}`).value = demoRatings[i];
+  }
 }
 
 function startTournament() {
+  const sel = document.getElementById('num-players');
+  N = sel ? parseInt(sel.value) : 8;
   kFactor = parseFloat(document.getElementById('k-factor').value) || 20;
   players = []; ratings = [];
   for (let i = 0; i < N; i++) {
@@ -412,7 +428,7 @@ function startTournament() {
     const rv = parseFloat(document.getElementById(`r${i}`).value);
     ratings.push(isNaN(rv) ? null : rv);
   }
-  results = Array.from({length:N}, () => Array(N).fill(null));
+  results = Array.from({length:8}, () => Array(8).fill(null)); // always 8x8
   document.getElementById('setup-section').style.display = 'none';
   document.getElementById('tournament-section').style.display = 'block';
   const lk = document.getElementById('k-factor-live');
@@ -442,6 +458,15 @@ function renderGames() {
   FIXED_ROUNDS.forEach((round, ri) => {
     let html = `<div class="round-group"><div class="round-label">Ronde ${ri+1}</div>`;
     round.forEach(([i,j]) => {
+      if (isSkipped(i, j)) {
+        const activeName = i < N ? players[i] : players[j];
+        html += `<div class="game-row" style="opacity:.3;pointer-events:none">
+          <div class="player-label" style="color:var(--text-muted)">${esc(activeName)}</div>
+          <div class="result-btns" style="font-size:.72rem;color:var(--text-muted);padding:0 .5rem;white-space:nowrap">speelt niet</div>
+          <div class="player-label right" style="color:var(--text-muted)">—</div>
+        </div>`;
+        return;
+      }
       const r = results[i][j];
       const aw=r==='w'?'active-w':'', ad=r==='d'?'active-d':'', al=r==='l'?'active-l':'';
       html += `<div class="game-row">
@@ -503,6 +528,7 @@ function calcNewRatings() {
   const deltas = Array(N).fill(0);
   FIXED_ROUNDS.forEach(round => {
     round.forEach(([i,j]) => {
+      if(isSkipped(i,j)) return;
       const r=results[i][j]; if(r===null) return;
       const ei=expectedScore(ratings[i],ratings[j]);
       const ej=expectedScore(ratings[j],ratings[i]);
@@ -519,16 +545,17 @@ function calcRoundDetails(playerIdx) {
   const details = [];
   FIXED_ROUNDS.forEach((round, ri) => {
     round.forEach(([i,j]) => {
-      let me=-1, opp=-1;
-      if(i===playerIdx){me=i;opp=j;}
-      else if(j===playerIdx){me=j;opp=i;}
+      let me=-1, opp=-1, isWhite=false;
+      if(i===playerIdx){me=i;opp=j;isWhite=true;}
+      else if(j===playerIdx){me=j;opp=i;isWhite=false;}
       else return;
       const r=results[me][opp]; if(r===null) return;
+      if(isSkipped(me,opp)) return; // overgeslagen partij telt niet mee
       const oppRating=ratings[opp];
       const ei=expectedScore(ratings[me],ratings[opp]);
       const si=r==='w'?1:r==='d'?.5:0;
       const delta=kFactor*(si-ei);
-      details.push({round:ri+1, opp, r, oppRating, ei, delta});
+      details.push({round:ri+1, opp, r, oppRating, ei, delta, isWhite});
     });
   });
   return details;
@@ -565,6 +592,7 @@ function renderStandings() {
       deltaCell=d>0?`<span class="delta-up">+${d}</span>`:d<0?`<span class="delta-down">${d}</span>`:`<span class="delta-zero">0</span>`;
     }
     const mutual=getMutualScore(s.i,scores.map(x=>x.i));
+    const byeCell = N===7 ? `<td style="color:var(--text-muted)">${s.bye>0?'+1':'–'}</td>` : '<td style="color:var(--mid-gray)">–</td>';
     return `<tr class="${rowClass}">
       <td class="rank-cell">${medal||rank+1}</td>
       <td class="player-name">${esc(players[s.i])}</td>
@@ -572,6 +600,7 @@ function renderStandings() {
       <td>${s.w}</td>
       <td>${s.d}</td>
       <td>${s.l}</td>
+      ${byeCell}
       <td class="score-pts">${formatPts(s.pts)}</td>
       <td class="sb-col">${formatPts(mutual)}</td>
       <td class="sb-col">${formatPts(s.sb)}</td>
@@ -590,13 +619,15 @@ function showRatingDetail(playerIdx) {
   let total=0;
   const rows=details.map(d=>{
     total+=d.delta;
-    const res=d.r==='w'?`<span class="result-badge rb-win">Wit wint</span>`:d.r==='d'?`<span class="result-badge rb-draw">Remise</span>`:`<span class="result-badge rb-loss">Zwart wint</span>`;
+    const res=d.r==='w'?`<span class="result-badge rb-win">Gewonnen</span>`:d.r==='d'?`<span class="result-badge rb-draw">Remise</span>`:`<span class="result-badge rb-loss">Verloren</span>`;
+    const kleur=d.isWhite?`<span class="result-badge" style="background:rgba(0,0,0,.08);color:#222">Wit</span>`:`<span class="result-badge" style="background:#222;color:#fff">Zwart</span>`;
     const dStr=d.delta>=0?`<span class="delta-up">+${d.delta.toFixed(1)}</span>`:`<span class="delta-down">${d.delta.toFixed(1)}</span>`;
     return `<tr>
       <td>R${d.round}</td>
       <td>${esc(players[d.opp])}</td>
+      <td>${kleur}</td>
       <td>${res}</td>
-      <td>${d.oppRating}</td>
+      <td>${d.oppRating!=null?d.oppRating:'&#8211;'}</td>
       <td>${(d.ei*100).toFixed(0)}%</td>
       <td>${dStr}</td>
     </tr>`;
@@ -604,7 +635,7 @@ function showRatingDetail(playerIdx) {
   const totalStr=total>=0?`<span class="delta-up">+${Math.round(total)}</span>`:`<span class="delta-down">${Math.round(total)}</span>`;
   const tbody=document.getElementById('modal-body');
   tbody.innerHTML=rows+`<tr>
-    <td colspan="5" style="text-align:right;font-weight:700">Totaal</td>
+    <td colspan="6" style="text-align:right;font-weight:700">Totaal</td>
     <td>${totalStr}</td>
   </tr>`;
   document.getElementById('rating-modal').classList.add('open');
