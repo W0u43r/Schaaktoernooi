@@ -535,6 +535,7 @@ function startTournament() {
 function resetTournament() {
   document.getElementById('setup-section').style.display = 'block';
   document.getElementById('tournament-section').style.display = 'none';
+  checkForSavedState();
 }
 
 function updateK(val) {
