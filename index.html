@@ -53,9 +53,9 @@
   header::before {
     content: '♟';
     position: absolute;
-    font-size: 12rem;
-    color: rgba(255,255,255,0.04);
-    top: -2rem; right: -2rem;
+    font-size: 5rem;
+    color: rgba(255,255,255,0.06);
+    top: .5rem; right: .8rem;
     line-height: 1;
   }
   header h1 {
@@ -296,11 +296,12 @@
   </div>
 
   <div class="players-grid" id="players-grid"></div>
-  <button class="btn" onclick="startTournament()">Toernooi starten</button>
-  <button class="btn btn-outline" onclick="fillDemo()">Demo namen</button>
+  <div style="display:flex;flex-direction:column;gap:.6rem;margin-top:.2rem">
+    <button class="btn" onclick="startTournament()">Toernooi starten</button>
+    <button class="btn btn-outline" style="margin-left:0" onclick="fillDemo()">Demo namen</button>
+  </div>
   <div id="restore-wrap" style="display:none;margin-top:.8rem;padding:.8rem;background:var(--off-white);border:1px solid var(--border);border-radius:8px">
     <div style="font-size:.85rem;color:var(--text);margin-bottom:.5rem">&#128190; <strong>Opgeslagen stand gevonden:</strong> <div id="restore-info" style="margin-top:.4rem"></div></div>
-    <button class="btn" onclick="restoreState()" style="font-size:.85rem;padding:.5rem 1.2rem">Herstel opgeslagen stand</button>
     <button class="btn btn-outline" onclick="clearSave()" style="font-size:.85rem;padding:.4rem .9rem;margin-left:.4rem">Verwijderen</button>
   </div>
 </div>
@@ -449,8 +450,8 @@ function checkForSavedState() {
     div.style.cssText = 'display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap';
     div.innerHTML = `<span style="font-weight:700">${esc(name)}</span>
       <span style="color:var(--text-muted);font-size:.78rem">${state.savedAt}</span>
-      <button class="btn" style="font-size:.75rem;padding:.3rem .8rem" onclick="restoreByKey('${key}')">Herstel</button>
-      <button class="btn btn-outline" style="font-size:.75rem;padding:.25rem .6rem" onclick="deleteByKey('${key}')">&#10005;</button>`;
+      <button class="btn" style="font-size:.75rem;padding:.3rem .8rem" onclick="restoreByKey('${key}')">Openen</button>
+      <button class="btn btn-outline" style="font-size:.75rem;padding:.25rem .6rem;border-color:var(--lose);color:var(--lose)" onclick="deleteByKey('${key}')">&#10005;</button>`;
     listEl.appendChild(div);
   });
 }
