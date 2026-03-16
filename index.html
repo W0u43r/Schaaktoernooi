@@ -324,9 +324,7 @@
             <th>W</th>
             <th>R</th>
             <th>V</th>
-            <th>Bye</th>
             <th>Punten</th>
-            <th>Onderl.</th>
             <th>SB</th>
             <th>Rating</th>
             <th>Nieuw</th>
@@ -458,15 +456,7 @@ function renderGames() {
   FIXED_ROUNDS.forEach((round, ri) => {
     let html = `<div class="round-group"><div class="round-label">Ronde ${ri+1}</div>`;
     round.forEach(([i,j]) => {
-      if (isSkipped(i, j)) {
-        const activeName = i < N ? players[i] : players[j];
-        html += `<div class="game-row" style="opacity:.3;pointer-events:none">
-          <div class="player-label" style="color:var(--text-muted)">${esc(activeName)}</div>
-          <div class="result-btns" style="font-size:.72rem;color:var(--text-muted);padding:0 .5rem;white-space:nowrap">speelt niet</div>
-          <div class="player-label right" style="color:var(--text-muted)">—</div>
-        </div>`;
-        return;
-      }
+      if (isSkipped(i, j)) return;
       const r = results[i][j];
       const aw=r==='w'?'active-w':'', ad=r==='d'?'active-d':'', al=r==='l'?'active-l':'';
       html += `<div class="game-row">
@@ -591,8 +581,6 @@ function renderStandings() {
       newRatingCell=`<button class="new-rating-btn" onclick="showRatingDetail(${s.i})">${nr}</button>`;
       deltaCell=d>0?`<span class="delta-up">+${d}</span>`:d<0?`<span class="delta-down">${d}</span>`:`<span class="delta-zero">0</span>`;
     }
-    const mutual=getMutualScore(s.i,scores.map(x=>x.i));
-    const byeCell = N===7 ? `<td style="color:var(--text-muted)">${s.bye>0?'+1':'–'}</td>` : '<td style="color:var(--mid-gray)">–</td>';
     return `<tr class="${rowClass}">
       <td class="rank-cell">${medal||rank+1}</td>
       <td class="player-name">${esc(players[s.i])}</td>
@@ -600,9 +588,7 @@ function renderStandings() {
       <td>${s.w}</td>
       <td>${s.d}</td>
       <td>${s.l}</td>
-      ${byeCell}
       <td class="score-pts">${formatPts(s.pts)}</td>
-      <td class="sb-col">${formatPts(mutual)}</td>
       <td class="sb-col">${formatPts(s.sb)}</td>
       <td>${ratingCell}</td>
       <td>${newRatingCell}</td>
