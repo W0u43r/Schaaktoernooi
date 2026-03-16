@@ -280,6 +280,10 @@
 <div class="card" id="setup-section">
   <div class="section-title">Spelers &amp; instellingen</div>
 
+  <div class="k-row" style="margin-bottom:.8rem">
+    <label for="toernooi-naam">Naam toernooi</label>
+    <input class="k-input" id="toernooi-naam" type="text" placeholder="bijv. Jeugdtoernooi 2025" style="width:220px;font-family:'Open Sans',sans-serif;font-size:.9rem;font-weight:600;text-align:left;padding-left:.7rem">
+  </div>
   <div class="k-row">
     <label for="num-players">Aantal spelers</label>
     <select class="k-input" id="num-players" onchange="buildSetup()" style="width:auto;padding:.4rem .6rem;cursor:pointer">
@@ -294,6 +298,11 @@
   <div class="players-grid" id="players-grid"></div>
   <button class="btn" onclick="startTournament()">Toernooi starten</button>
   <button class="btn btn-outline" onclick="fillDemo()">Demo namen</button>
+  <div id="restore-wrap" style="display:none;margin-top:.8rem;padding:.8rem;background:var(--off-white);border:1px solid var(--border);border-radius:8px">
+    <div style="font-size:.85rem;color:var(--text);margin-bottom:.5rem">&#128190; <strong>Opgeslagen stand gevonden:</strong> <div id="restore-info" style="margin-top:.4rem"></div></div>
+    <button class="btn" onclick="restoreState()" style="font-size:.85rem;padding:.5rem 1.2rem">Herstel opgeslagen stand</button>
+    <button class="btn btn-outline" onclick="clearSave()" style="font-size:.85rem;padding:.4rem .9rem;margin-left:.4rem">Verwijderen</button>
+  </div>
 </div>
 
 <!-- TOERNOOI -->
@@ -345,9 +354,11 @@
     </div>
   </div>
 
-  <div style="text-align:center; margin-top:.5rem">
+  <div style="text-align:center; margin-top:.5rem; display:flex; gap:.6rem; justify-content:center; flex-wrap:wrap">
     <button class="btn btn-outline" onclick="resetTournament()">&larr; Nieuwe namen</button>
+    <button class="btn" onclick="saveState()" style="background:var(--blue)">&#128190; Opslaan</button>
   </div>
+  <div id="save-msg" style="text-align:center;font-size:.78rem;color:var(--blue);margin-top:.5rem;min-height:1.2em"></div>
 
 </div><!-- /tournament-section -->
 </div><!-- /container -->
@@ -375,7 +386,7 @@
 
 <script>
 let N = 8;
-let players = [], ratings = [], results = [], kFactor = 40;
+let players = [], ratings = [], results = [], kFactor = 40, tournamentName = '';
 
 // Vaste indeling — altijd het 8-spelers schema
 // Bij 7 spelers wordt speler 8 (index 7) weggelaten: zijn partijen tellen niet mee en geven geen punten
@@ -391,6 +402,91 @@ const FIXED_ROUNDS = [
 
 function isSkipped(i, j) {
   return i >= N || j >= N;
+}
+
+function saveState() {
+  const state = {
+    N, kFactor, players, ratings,
+    results, tournamentName,
+    savedAt: new Date().toLocaleString('nl-NL')
+  };
+  const key = 'schaaktoernooi_' + (tournamentName || 'default');
+localStorage.setItem(key, JSON.stringify(state));
+localStorage.setItem('schaaktoernooi_lastkey', key);
+  const msg = document.getElementById('save-msg');
+  msg.textContent = '✓ Opgeslagen op ' + state.savedAt;
+  setTimeout(() => { msg.textContent = ''; }, 3000);
+}
+
+function restoreState() {
+  const lastKey = localStorage.getItem('schaaktoernooi_lastkey');
+  if (lastKey) restoreByKey(lastKey);
+}
+
+function clearSave() {
+  // kept for compatibility
+}
+
+function checkForSavedState() {
+  // Find all saved tournaments
+  const saved = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key.startsWith('schaaktoernooi_') || key === 'schaaktoernooi_lastkey') continue;
+    try {
+      const state = JSON.parse(localStorage.getItem(key));
+      saved.push({ key, state });
+    } catch(e) {}
+  }
+  if (saved.length === 0) return;
+  const wrap = document.getElementById('restore-wrap');
+  wrap.style.display = 'block';
+  const listEl = document.getElementById('restore-info');
+  listEl.innerHTML = '';
+  saved.forEach(({ key, state }) => {
+    const name = state.tournamentName || key.replace('schaaktoernooi_','');
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap';
+    div.innerHTML = `<span style="font-weight:700">${esc(name)}</span>
+      <span style="color:var(--text-muted);font-size:.78rem">${state.savedAt}</span>
+      <button class="btn" style="font-size:.75rem;padding:.3rem .8rem" onclick="restoreByKey('${key}')">Herstel</button>
+      <button class="btn btn-outline" style="font-size:.75rem;padding:.25rem .6rem" onclick="deleteByKey('${key}')">&#10005;</button>`;
+    listEl.appendChild(div);
+  });
+}
+
+function restoreByKey(key) {
+  const raw = localStorage.getItem(key);
+  if (!raw) return;
+  const state = JSON.parse(raw);
+  N = state.N || 8;
+  kFactor = state.kFactor || 40;
+  players = state.players;
+  ratings = state.ratings;
+  results = state.results;
+  tournamentName = state.tournamentName || '';
+  const sel = document.getElementById('num-players');
+  if (sel) sel.value = N;
+  const kf = document.getElementById('k-factor');
+  if (kf) kf.value = kFactor;
+  const nameField = document.getElementById('toernooi-naam');
+  if (nameField) nameField.value = tournamentName;
+  document.getElementById('setup-section').style.display = 'none';
+  document.getElementById('tournament-section').style.display = 'block';
+  const lk = document.getElementById('k-factor-live');
+  if (lk) lk.value = kFactor;
+  renderAll();
+}
+
+function deleteByKey(key) {
+  localStorage.removeItem(key);
+  checkForSavedState();
+  // Hide wrap if no more saved
+  let any = false;
+  for (let i = 0; i < localStorage.length; i++) {
+    if (localStorage.key(i).startsWith('schaaktoernooi_') && localStorage.key(i) !== 'schaaktoernooi_lastkey') { any = true; break; }
+  }
+  if (!any) document.getElementById('restore-wrap').style.display = 'none';
 }
 
 function buildSetup() {
@@ -723,6 +819,11 @@ function renderStats() {
   const played=scores.reduce((a,s)=>a+s.played,0)/2;
   const pct=total>0?Math.round(played/total*100):0;
   const leader=sortedStandings()[0];
+  // Update page title with tournament name
+  const headerTitle = document.querySelector('header h1');
+  if (headerTitle && tournamentName) {
+    headerTitle.innerHTML = `&#9820; KNSB <span>${esc(tournamentName)}</span>`;
+  }
   document.getElementById('stats-row').innerHTML=`
     <div class="stat-box">
       <div class="stat-val">${played}/${total}</div>
@@ -735,7 +836,7 @@ function renderStats() {
     </div>
     <div class="stat-box">
       <div class="stat-val" style="font-size:1.1rem">${esc(players[leader.i])}</div>
-      <div class="stat-lbl">Koploper</div>
+      <div class="stat-lbl">${played===total?'&#127942; Winnaar':'Koploper'}</div>
     </div>
     <div class="stat-box">
       <div class="stat-val">K=${kFactor}</div>
@@ -758,6 +859,7 @@ if(isIOS && !window.navigator.standalone && !sessionStorage.getItem('ib')) {
 }
 
 buildSetup();
+checkForSavedState();
 </script>
 </body>
 </html>
