@@ -290,9 +290,6 @@
       <option value="8" selected>8 spelers</option>
       <option value="7">7 spelers</option>
     </select>
-    <label for="k-factor" style="margin-left:.5rem">K-factor</label>
-    <input class="k-input" id="k-factor" type="number" value="40" min="1" max="800">
-    <span class="k-hint">standaard 40 voor jeugd</span>
   </div>
 
   <div class="players-grid" id="players-grid"></div>
@@ -467,8 +464,6 @@ function restoreByKey(key) {
   tournamentName = state.tournamentName || '';
   const sel = document.getElementById('num-players');
   if (sel) sel.value = N;
-  const kf = document.getElementById('k-factor');
-  if (kf) kf.value = kFactor;
   const nameField = document.getElementById('toernooi-naam');
   if (nameField) nameField.value = tournamentName;
   document.getElementById('setup-section').style.display = 'none';
@@ -515,7 +510,7 @@ function fillDemo() {
 function startTournament() {
   const sel = document.getElementById('num-players');
   N = sel ? parseInt(sel.value) : 8;
-  kFactor = parseFloat(document.getElementById('k-factor').value) || 40;
+  kFactor = parseFloat(document.getElementById('k-factor-live').value) || 40;
   tournamentName = document.getElementById('toernooi-naam').value.trim() || 'Toernooi';
   players = []; ratings = [];
   for (let i = 0; i < N; i++) {
@@ -839,10 +834,6 @@ function renderStats() {
     <div class="stat-box">
       <div class="stat-val" style="font-size:1.1rem">${esc(players[leader.i])}</div>
       <div class="stat-lbl">${played===total?'&#127942; Winnaar':'Koploper'}</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-val">K=${kFactor}</div>
-      <div class="stat-lbl">K-factor</div>
     </div>`;
 }
 
