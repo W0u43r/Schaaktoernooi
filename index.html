@@ -287,8 +287,8 @@
       <option value="7">7 spelers</option>
     </select>
     <label for="k-factor" style="margin-left:.5rem">K-factor</label>
-    <input class="k-input" id="k-factor" type="number" value="20" min="1" max="800">
-    <span class="k-hint">standaard 20 voor jeugd</span>
+    <input class="k-input" id="k-factor" type="number" value="40" min="1" max="800">
+    <span class="k-hint">standaard 40 voor jeugd</span>
   </div>
 
   <div class="players-grid" id="players-grid"></div>
@@ -303,7 +303,7 @@
 
   <div class="k-live-strip">
     <label for="k-factor-live">K-factor</label>
-    <input class="k-input" id="k-factor-live" type="number" value="20" min="1" max="800" oninput="updateK(this.value)">
+    <input class="k-input" id="k-factor-live" type="number" value="40" min="1" max="800" oninput="updateK(this.value)">
     <span class="k-hint">Aanpassen herberekent de ratings direct</span>
   </div>
 
@@ -329,6 +329,7 @@
             <th>Rating</th>
             <th>Nieuw</th>
             <th>+/-</th>
+            <th>TPR</th>
           </tr>
         </thead>
         <tbody id="standings-body"></tbody>
@@ -374,10 +375,10 @@
 
 <script>
 let N = 8;
-let players = [], ratings = [], results = [], kFactor = 20;
+let players = [], ratings = [], results = [], kFactor = 40;
 
 // Vaste indeling — altijd het 8-spelers schema
-// Bij 7 spelers worden partijen waarbij speler index 7 betrokken is overgeslagen (geen punten)
+// Bij 7 spelers wordt speler 8 (index 7) weggelaten: zijn partijen tellen niet mee en geven geen punten
 const FIXED_ROUNDS = [
   [[5,1],[4,2],[3,7],[6,0]],
   [[1,4],[0,5],[2,3],[7,6]],
@@ -565,6 +566,62 @@ function sortedStandings() {
   return withSB;
 }
 
+
+// TPR - Tournament Performance Rating
+// Gebaseerd op FIDE omzettingstabel (scorepercentage -> ratingverschil)
+const FIDE_TABLE = [
+  [1.00, 800],[0.99, 677],[0.98, 589],[0.97, 538],[0.96, 501],[0.95, 470],
+  [0.94, 444],[0.93, 422],[0.92, 401],[0.91, 383],[0.90, 366],[0.89, 351],
+  [0.88, 336],[0.87, 322],[0.86, 309],[0.85, 296],[0.84, 284],[0.83, 273],
+  [0.82, 262],[0.81, 251],[0.80, 240],[0.79, 230],[0.78, 220],[0.77, 211],
+  [0.76, 202],[0.75, 193],[0.74, 184],[0.73, 175],[0.72, 166],[0.71, 158],
+  [0.70, 149],[0.69, 141],[0.68, 133],[0.67, 125],[0.66, 117],[0.65, 110],
+  [0.64, 102],[0.63,  95],[0.62,  87],[0.61,  80],[0.60,  72],[0.59,  65],
+  [0.58,  57],[0.57,  50],[0.56,  43],[0.55,  36],[0.54,  29],[0.53,  21],
+  [0.52,  14],[0.51,   7],[0.50,   0],[0.49,  -7],[0.48, -14],[0.47, -21],
+  [0.46, -29],[0.45, -36],[0.44, -43],[0.43, -50],[0.42, -57],[0.41, -65],
+  [0.40, -72],[0.39, -80],[0.38, -87],[0.37, -95],[0.36,-102],[0.35,-110],
+  [0.34,-117],[0.33,-125],[0.32,-133],[0.31,-141],[0.30,-149],[0.29,-158],
+  [0.28,-166],[0.27,-175],[0.26,-184],[0.25,-193],[0.24,-202],[0.23,-211],
+  [0.22,-220],[0.21,-230],[0.20,-240],[0.19,-251],[0.18,-262],[0.17,-273],
+  [0.16,-284],[0.15,-296],[0.14,-309],[0.13,-322],[0.12,-336],[0.11,-351],
+  [0.10,-366],[0.09,-383],[0.08,-401],[0.07,-422],[0.06,-444],[0.05,-470],
+  [0.04,-501],[0.03,-538],[0.02,-589],[0.01,-677],[0.00,-800]
+];
+
+function scorePercentageToDp(pct) {
+  // Find closest entry in FIDE table
+  let best = FIDE_TABLE[0];
+  let bestDiff = Math.abs(pct - best[0]);
+  for (const entry of FIDE_TABLE) {
+    const diff = Math.abs(pct - entry[0]);
+    if (diff < bestDiff) { bestDiff = diff; best = entry; }
+  }
+  return best[1];
+}
+
+function calcTPR(playerIdx) {
+  // Collect opponents with known ratings
+  const oppRatings = [];
+  let pts = 0, games = 0;
+  for (let j = 0; j < N; j++) {
+    if (j === playerIdx) continue;
+    if (isSkipped(playerIdx, j) || isSkipped(j, playerIdx)) continue;
+    const r = results[playerIdx][j];
+    if (r === null) continue;
+    if (ratings[j] == null) return null; // need all opp ratings
+    oppRatings.push(ratings[j]);
+    if (r === 'w') pts += 1;
+    else if (r === 'd') pts += 0.5;
+    games++;
+  }
+  if (games === 0 || oppRatings.length === 0) return null;
+  const avgOpp = oppRatings.reduce((a,b) => a+b, 0) / oppRatings.length;
+  const pct = pts / games;
+  const dp = scorePercentageToDp(pct);
+  return Math.round(avgOpp + dp);
+}
+
 function renderStandings() {
   const scores=sortedStandings();
   const rc=calcNewRatings();
@@ -576,6 +633,8 @@ function renderStandings() {
     const ratingCell=ratings[s.i]!=null?ratings[s.i]:`<span style="color:var(--mid-gray)">–</span>`;
     let newRatingCell=`<span style="color:var(--mid-gray)">–</span>`;
     let deltaCell=`<span style="color:var(--mid-gray)">–</span>`;
+    const tprVal = calcTPR(s.i);
+    const tprCell = tprVal !== null ? tprVal : `<span style="color:var(--mid-gray)">–</span>`;
     if(rc){
       const d=rc[s.i].delta, nr=rc[s.i].newRating;
       newRatingCell=`<button class="new-rating-btn" onclick="showRatingDetail(${s.i})">${nr}</button>`;
@@ -593,6 +652,7 @@ function renderStandings() {
       <td>${ratingCell}</td>
       <td>${newRatingCell}</td>
       <td>${deltaCell}</td>
+      <td style="font-family:'Montserrat',sans-serif;font-weight:700;color:var(--blue-mid);font-size:.82rem">${tprCell}</td>
     </tr>`;
   }).join('');
 }
